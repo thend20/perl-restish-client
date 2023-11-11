@@ -1,3 +1,4 @@
+```
 NAME
     Restish::Client - A RESTish client...in perl!
 
@@ -158,3 +159,4 @@ POD ERRORS
     Around line 452:
         =over without closing =back
 
+```
