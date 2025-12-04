@@ -158,6 +158,17 @@ c<head_params_default> method.
 Invalid parameters, such as an invalid uri or not supplying a hashref to
 query_params, will result in an exception.
 
+Instead of body_params, you can use raw_body to upload a file.
+Use content_type to specify the Content-Type.
+
+    my $res = $client->request(
+        method       => 'POST',
+        uri          => 'uploads.json',
+        query_params => { filename => 'important-doc.pdf' },
+        raw_body     => $file_data,
+        content_type => 'application/pdf',
+    );
+
 =cut
 
 sub request {
@@ -176,7 +187,11 @@ sub request {
         template_params => 1,
         query_params => 1,
         body_params => 1,
-        head_params => 1
+        head_params => 1,
+
+        # to pass in a file
+        raw_body => 1,
+        content_type => 1,
     );
 
     foreach (keys %params) {
@@ -209,6 +224,8 @@ sub request {
         if $params{head_params};
     $header->header('Content-Type' => 'application/json')
         if $params{body_params};
+    $header->header('Content-Type' => $params{content_type})
+        if $params{content_type};
 
     my $req = HTTP::Request->new(
         $params{method},
@@ -219,6 +236,10 @@ sub request {
     if ($params{body_params}) {
         $CANONICAL ? $req->content(JSON->new->utf8->canonical->encode($params{body_params}))
                    : $req->content(encode_json($params{body_params}));
+    }
+
+    if ($params{raw_body}) {
+        $req->content($params{raw_body});
     }
 
     my $agent = $self->_get_agent();
@@ -314,7 +335,7 @@ Example:
 
 =cut
 sub thin_request {
-    my ($self, $method, $uri, @data) = @_;
+    my ($self, $method, $uri, $query_params, @data) = @_;
 
     my $agent = $self->_get_agent();
 
@@ -333,7 +354,7 @@ sub thin_request {
         @data = [];
     }
 
-    my $joined_uri = $self->_assemble_uri($uri);
+    my $joined_uri = $self->_assemble_uri($uri,$query_params);
 
     my $res = $agent->$method($joined_uri, @data);
 
@@ -528,6 +549,8 @@ sub _get_agent {
     $options{ssl_opts} = $self->ssl_opts if $self->ssl_opts;
 
     $options{cookie_jar} = $self->_get_cookie_jar() if $self->cookie_jar;
+
+    $options{env_proxy} = 1;
 
     return LWP::UserAgent->new(%options);
 }
