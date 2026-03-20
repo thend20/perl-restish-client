@@ -3,25 +3,42 @@ NAME
     Restish::Client - A RESTish client...in perl!
 
 SYNOPSIS
-    EXAMPLES HERE
+    my $client = Restish::Client->new(
+        uri_host            => 'https://vault.example.com/',
+        head_params_default => { X-Vault-Token => a_token },
+        agent_options       => { timeout => 5 },
+        require_https       => 1,
+        ssl_opts => {
+            -=> 1,
+            SSL_cert_file   => "/etc/ssl/certs/cert.pem",
+            SSL_key_file    => "/etc/ssl/private_keys/key.pem",
+        },
+        cooke_jar           => 1,
+    );
+
+    $client->head_params_default({ 'X-Vault-Token' => $auth_token });
+    $client->ssl_opts({ SSL_use_cert => 1 });
+
+    $client->cookie_jar(1); # OR
+    $client->cookie_jar(/path/to/cookiejar);
+
+    $client->request( method      => 'POST',
+                      uri         => 'already/escaped/path',  
+                      query_params  => { param1 => value1, param2 => value2 },
+                      body_params => { body_param1 => bvalue1, body_param2 => bvalue2 },
+                      head_params => { X-Subject-Token => $subject_token } 
+    );
+
+    # request method shorthand
+    $client->GET(
+        uri => 'endpoint',
+    );
 
 DESCRIPTION
     This module provides a Perl wrapper for the REST-like API's.
 
   METHODS
     "new"
-                    my $client = Restish::Client->new(
-                        uri_host            => 'https://vault.example.com/',
-                        head_params_default => { X-Vault-Token => a_token },
-                        agent_options       => { timeout => 5 },
-                        require_https       => 1,
-                        ssl_opts => {
-                            -=> 1,
-                            SSL_cert_file   => "/etc/ssl/certs/cert.pem",
-                            SSL_key_file    => "/etc/ssl/private_keys/key.pem",
-                        },
-                        cooke_jar           => 1,
-                    );
 
                 Construct a new Restish::Client object. The uri_host is used
                 as the base uri for each API call, and serves as a template
@@ -37,31 +54,19 @@ DESCRIPTION
                 an https uri.
 
     "head_params_default"
-                    $client->head_params_default({ 'X-Vault-Token' => $auth_token });
 
                 Supply a hashref specifying default header parameters to be
                 sent with every request using this object.
 
     "ssl_opts"
-                    $client->ssl_opts({ SSL_use_cert => 1 });
-
                 Supply a hashref specifying default LWP UserAgent SSL
                 options to be sent with every request using this object.
 
     "cookie_jar"
-                    $client->cookie_jar(1);
-                    $client->cookie_jar(/path/to/cookiejar)
-
                 Enable LWP UserAgent's cookie_jar. Optionally store the
                 cookie jar to disk.
 
     "request"
-                    $client->request( method      => 'POST',
-                                      uri         => 'already/escaped/path',  
-                                      query_params  => { param1 => value1, param2 => value2 },
-                                      body_params => { body_param1 => bvalue1, body_param2 => bvalue2 },
-                                      head_params => { X-Subject-Token => $subject_token } );
-
                 Send a request based off of the object's base uri_host,
                 returning a Perl data structure of the parsed JSON response
                 in the event of a 2xx series response code. c<method> and
@@ -142,21 +147,5 @@ DESCRIPTION
 
                 "{trim_tokens =" 0}>
                             Whether to trim tokens.
-
-  PRIVATE METHODS
-    The following private methods are documented in case a subclass should
-    need to override them.
-
-    "_get_agent"
-                Returns a new user agent object for use in requests with
-                this client. "_get_agent" uses "_agent_options" to get the
-                constructor options for the agent.
-
-POD ERRORS
-    Hey! The above document had some coding errors, which are explained
-    below:
-
-    Around line 452:
-        =over without closing =back
 
 ```
