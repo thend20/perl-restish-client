@@ -34,7 +34,32 @@ Restish::Client - A RESTish client...in perl!
 
 =head1 SYNOPSIS
 
-EXAMPLES HERE
+    use Restish::Client;
+
+    my $client = Restish::Client->new(
+        uri_host            => 'https://api.example.com/',
+        head_params_default => { 'Authorization' => 'Bearer mytoken' },
+    );
+
+    # GET request
+    my $data = $client->GET( uri => '/v1/users' );
+
+    # POST with body parameters
+    my $result = $client->POST(
+        uri         => '/v1/users',
+        body_params => { name => 'Alice', email => 'alice@example.com' },
+    );
+
+    # GET with URI template and query parameters
+    my $user = $client->GET(
+        uri             => '/v1/users/%(user_id)s',
+        template_params => { user_id => '42' },
+        query_params    => { format => 'json' },
+    );
+
+    if ($client->response_code == 200) {
+        print $user->{name};
+    }
 
 =head1 DESCRIPTION
 
@@ -48,15 +73,15 @@ This module provides a Perl wrapper for the REST-like API's.
 
     my $client = Restish::Client->new(
         uri_host            => 'https://vault.example.com/',
-        head_params_default => { X-Vault-Token => a_token },
+        head_params_default => { 'X-Vault-Token' => $a_token },
         agent_options       => { timeout => 5 },
         require_https       => 1,
         ssl_opts => {
-            -=> 1,
+            SSL_use_cert    => 1,
             SSL_cert_file   => "/etc/ssl/certs/cert.pem",
             SSL_key_file    => "/etc/ssl/private_keys/key.pem",
         },
-        cooke_jar           => 1,
+        cookie_jar          => 1,
     );
 
 Construct a new Restish::Client object. The uri_host is used as the base
