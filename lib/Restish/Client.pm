@@ -648,4 +648,8 @@ sub error {
     croak($error);
 }
 
+=back
+
+=cut
+
 1;
