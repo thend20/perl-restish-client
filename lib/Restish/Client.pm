@@ -312,6 +312,8 @@ sub request {
 
 $client->METHOD(params) will ship the METHOD as method=>$method to the request
 
+Available aliases: GET, POST, PUT, PATCH, DELETE, LIST
+
 =cut
 sub GET {
     my ($self, %params) = @_;   
@@ -321,6 +323,11 @@ sub GET {
 sub POST {
     my ($self, %params) = @_;
     $params{method} = 'POST';
+    return $self->request(%params);
+}
+sub PUT {
+    my ($self, %params) = @_;
+    $params{method} = 'PUT';
     return $self->request(%params);
 }
 sub LIST {
@@ -342,64 +349,88 @@ sub PATCH {
 
 =item C<thin_request>
 
-Send a request directly to a LWP::UserAgent request method.  These arguments of the
-requst may be in the form of key=>value, or multiples of k1=>v1, k2=>v2.  Complex
-structures are not supported.
+    my $res = $client->thin_request($method, $uri, $query_params, @lwp_args);
 
-Usage:
+Send a request through the matching L<LWP::UserAgent> method (C<get>, C<post>,
+C<put>, C<patch> or C<delete>) instead of building a JSON request.  Use it for
+APIs that expect form-encoded bodies.  C<LIST> is not supported.
 
-  # For GET/DELETE supply each k=>v pair as a new array element
-  $client->thin_request('GET', $URI, key1=> val1, key2 => val2);
+=over 4
 
-  # For POST/PUT if you wrap the k=>v pairs into a structure they will be sent as form data
-  $client->thin_request('PUT', $URI, {key1 => val1, key2 => val2});
+=item C<$method>
 
-Example:
+One of C<GET>, C<POST>, C<PUT>, C<PATCH> or C<DELETE>.
 
-  my $res = $client->thin_request('POST', "public/auth", { user => $user, pass => $pass });
+=item C<$uri>
+
+Path joined to C<uri_host>, as with C<request>.
+
+=item C<$query_params>
+
+Hashref (or arrayref of pairs) appended to the uri as a query string, or
+C<undef> for none.  This argument is positional, so pass C<undef> when you have
+no query parameters but do have form data.
+
+=item C<@lwp_args>
+
+Passed unchanged to the LWP::UserAgent method.  For C<POST>, C<PUT> and C<PATCH>
+this is an optional hashref or arrayref of form fields, sent as an
+C<application/x-www-form-urlencoded> body, followed by any extra header
+pairs.  For C<GET> and C<DELETE> it is header pairs only; these requests do not
+send a body.
+
+=back
+
+The headers from C<head_params_default> are sent with every request.
+
+Returns the decoded data if the response has a JSON content type, otherwise
+the response body as a string.  Returns 0 if the request failed or a JSON
+response could not be decoded.  Use C<response_code> and C<response_body> to
+inspect the response.
+
+Examples:
+
+    # POST form data
+    my $res = $client->thin_request('POST', 'public/auth', undef,
+        { user => $user, pass => $pass });
+
+    # GET with query parameters: /servers?status=active
+    my $servers = $client->thin_request('GET', 'servers', { status => 'active' });
+
+    # GET with an extra request header
+    my $res = $client->thin_request('GET', 'servers', undef,
+        'X-Request-Id' => $id);
+
+    # PUT form data with query parameters
+    $client->thin_request('PUT', 'servers/web1', { notify => 1 },
+        { status => 'down' });
 
 =cut
 sub thin_request {
-    my ($self, $method, $uri, $query_params, @data) = @_;
+    my ($self, $method, $uri, $query_params, @lwp_args) = @_;
 
-    my $agent = $self->_get_agent();
+    $self->error("Invalid method for thin_request: $method")
+        unless $VALID_METHOD{$method} && $method ne 'LIST';
 
-    die("invalid method") unless $VALID_METHOD{$method};
-
-    # Don't support LIST
-    if ($method eq 'LIST') {
-        __PACKAGE__->error("thin_request does not support LIST");
-    }
-
-    # lc for function call
-    $method = lc($method);
-
-    # POST will require a structure
-    if ($method eq 'post' && !@data) {
-        @data = [];
-    }
-
-    my $joined_uri = $self->_assemble_uri($uri,$query_params);
-
-    my $res = $agent->$method($joined_uri, @data);
+    my $lwp_method = lc $method;
+    my $res = $self->_get_agent->$lwp_method(
+        $self->_assemble_uri($uri, $query_params), @lwp_args);
 
     $self->_set__response($res);
 
-    if ($res->is_success) {
-        if (defined $res->decoded_content) {
-            if ($res->header("Content-Type") =~ /^application\/json\b/i) {
-                my $json = eval {return decode_json $res->decoded_content} || return 0;
-                return $json;
-            } else {
-                return $res->decoded_content;
-            }
-        }
-
-        # request succeeded, but response had no content
-        return 1;
-    }    
     # request failed
-    return 0;
+    return 0 unless $res->is_success;
+
+    my $content = $res->decoded_content;
+
+    # request succeeded, but content could not be decoded
+    return 1 unless defined $content;
+
+    if (($res->header('Content-Type') || '') =~ m{^application/json\b}i) {
+        return eval { decode_json $content } || 0;
+    }
+
+    return $content;
 }
 
 =item C<is_success>
